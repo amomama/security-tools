@@ -1,0 +1,76 @@
+---
+- hosts: 127.0.0.1
+  vars:
+    slave: 127.0.0.1
+    remote_user: root
+    public_ip_addresses: "{{ lookup('file', 'ip_list.txt', errors='ignore') }}"
+  tasks:
+    - ec2_instance_info:
+        region: "{{ item }}"
+        filters:
+          instance-state-name: [ "running" ]
+      register: ec2_instance_info
+      loop:
+        - us-east-1
+        - us-east-2
+        - us-west-1
+        - us-west-2
+        - af-south-1
+        - ap-east-1
+        - ap-south-1
+        - ap-northeast-2
+        - ap-southeast-1
+        - ap-southeast-2
+        - ap-northeast-1
+        - ca-central-1
+        - eu-central-1
+        - eu-west-1
+        - eu-west-2
+        - eu-south-1
+        - eu-west-3
+        - eu-north-1
+        - me-south-1
+        - sa-east-1
+      when: public_ip_addresses == ''
+
+    - name:
+      set_fact:
+        _public_ip_addresses: "{{ ec2_instance_info | json_query('results[].instances[].public_ip_address') | join(' ') }}"
+      when: public_ip_addresses == ''
+
+    - name:
+      set_fact:
+        _public_ip_addresses: "{{ public_ip_addresses | replace('\n', ' ') | replace(',', ' ') }}"
+      when: public_ip_addresses != ''
+
+    - apt:
+        name: nmap
+        update_cache: yes
+        state: latest
+      delegate_to: "{{ slave }}"
+      remote_user: "{{ remote_user }}"
+      become: yes
+
+    - name: Set date variable
+      set_fact:
+        date: "{{ lookup('pipe', 'date +%Y_%m_%d_%H_%M_%S') }}"
+
+    - name: Check ports
+      shell: nmap -p 0-65535 -oX /tmp/{{ date }}.xml --webxml {{ _public_ip_addresses }}
+      delegate_to: "{{ slave }}"
+      remote_user: "{{ remote_user }}"
+
+    - name: Copy report from remote
+      fetch:
+        src: "/tmp/{{ date }}.xml"
+        dest: "{{ date }}.xml"
+        flat: yes
+      delegate_to: "{{ slave }}"
+      remote_user: "{{ remote_user }}"
+
+    - name: Cleanup
+      file:
+        path: "/tmp/{{ date }}.xml"
+        state: absent
+      delegate_to: "{{ slave }}"
+      remote_user: "{{ remote_user }}"
