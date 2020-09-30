@@ -1,5 +1,7 @@
+## port_scan
+
 ### Description
-This playbook scan provided hosts for open ports in range 0..65535 using nmap. On success scan, xml report will be generated and could be viewed in browser
+Playbook scans provided hosts for open ports in range 0..65535 using nmap. On success scan, xml report will be generated and could be viewed in browser
 
 ### Usage
 1. Install Ansible
